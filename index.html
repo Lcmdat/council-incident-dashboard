@@ -1,78 +1,284 @@
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script>
-  const dataUrl = "https://councilincidents01.blob.core.windows.net/public-dashboard-data/summary.json";
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Council Incident Dashboard</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f3f4f6;
+      margin: 0;
+      padding: 24px;
+      color: #111827;
+    }
+    h1 {
+      margin: 0 0 8px 0;
+    }
+    .subtitle {
+      color: #6b7280;
+      margin-bottom: 24px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .card, .section {
+      background: white;
+      border-radius: 10px;
+      padding: 20px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+    }
+    .label {
+      color: #6b7280;
+      font-size: 14px;
+      margin-bottom: 10px;
+    }
+    .metric {
+      font-size: 32px;
+      font-weight: bold;
+    }
+    .section {
+      margin-bottom: 24px;
+    }
+    .bars {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 16px;
+    }
+    .bar-row {
+      display: grid;
+      grid-template-columns: 180px 1fr 60px;
+      gap: 12px;
+      align-items: center;
+    }
+    .bar-label {
+      font-size: 14px;
+    }
+    .bar-wrap {
+      background: #e5e7eb;
+      height: 20px;
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .bar {
+      background: #2563eb;
+      height: 100%;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+    }
+    th, td {
+      padding: 10px;
+      text-align: left;
+      border-bottom: 1px solid #e5e7eb;
+      font-size: 14px;
+    }
+    th {
+      background: #f9fafb;
+    }
+    .footer {
+      color: #6b7280;
+      font-size: 14px;
+      margin-top: 8px;
+    }
+    .error {
+      color: #b91c1c;
+      font-weight: bold;
+      margin-top: 12px;
+      white-space: pre-wrap;
+    }
+    @media (max-width: 1000px) {
+      .grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+    @media (max-width: 640px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+      .bar-row {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>Council Incident Dashboard</h1>
+  <div class="subtitle">Public summary of community service incidents</div>
 
-  async function loadDashboard() {
-    try {
-      const response = await fetch(dataUrl);
-      if (!response.ok) {
-        throw new Error("HTTP error " + response.status);
+  <div class="grid">
+    <div class="card">
+      <div class="label">Total Incidents</div>
+      <div class="metric" id="totalIncidents">Loading...</div>
+    </div>
+    <div class="card">
+      <div class="label">Open Incidents</div>
+      <div class="metric" id="openIncidents">Loading...</div>
+    </div>
+    <div class="card">
+      <div class="label">Resolved Incidents</div>
+      <div class="metric" id="resolvedIncidents">Loading...</div>
+    </div>
+    <div class="card">
+      <div class="label">In Progress Incidents</div>
+      <div class="metric" id="inProgressIncidents">Loading...</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Incidents by Category</h2>
+    <div id="categoryBars" class="bars"></div>
+  </div>
+
+  <div class="section">
+    <h2>Recent Records</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Incident ID</th>
+          <th>Reported Date</th>
+          <th>Suburb</th>
+          <th>Category</th>
+          <th>Status</th>
+          <th>Priority</th>
+        </tr>
+      </thead>
+      <tbody id="recentRecordsBody"></tbody>
+    </table>
+  </div>
+
+  <div class="footer">
+    Last updated: <span id="lastUpdated">Loading...</span>
+  </div>
+
+  <div id="errorBox" class="error"></div>
+
+  <script>
+    const dataUrl = "https://councilincidents01.blob.core.windows.net/public-dashboard-data/summary.json";
+
+    function setText(id, value) {
+      document.getElementById(id).textContent = value ?? "-";
+    }
+
+    function renderBars(items) {
+      const container = document.getElementById("categoryBars");
+      container.innerHTML = "";
+
+      if (!items || items.length === 0) {
+        container.innerHTML = "<div>No category data available.</div>";
+        return;
       }
 
-      const raw = await response.text();
-      let data = JSON.parse(raw);
+      const max = Math.max(...items.map(x => Number(x.count) || 0), 1);
 
-      if (typeof data === "string") {
-        data = JSON.parse(data);
-      }
+      items.forEach(item => {
+        const row = document.createElement("div");
+        row.className = "bar-row";
 
-      console.log("Dashboard data loaded:", data);
+        const label = document.createElement("div");
+        label.className = "bar-label";
+        label.textContent = item.category ?? "Unknown";
 
-      document.getElementById("totalIncidents").textContent =
-        data.metrics?.totalIncidents ?? "-";
-      document.getElementById("openIncidents").textContent =
-        data.metrics?.openIncidents ?? "-";
-      document.getElementById("resolvedIncidents").textContent =
-        data.metrics?.resolvedIncidents ?? "-";
-      document.getElementById("inProgressIncidents").textContent =
-        data.metrics?.inProgressIncidents ?? "-";
-      document.getElementById("lastUpdated").textContent =
-        data.lastUpdated ?? "-";
+        const wrap = document.createElement("div");
+        wrap.className = "bar-wrap";
 
+        const bar = document.createElement("div");
+        bar.className = "bar";
+        bar.style.width = `${((Number(item.count) || 0) / max) * 100}%`;
+
+        wrap.appendChild(bar);
+
+        const count = document.createElement("div");
+        count.textContent = item.count ?? 0;
+
+        row.appendChild(label);
+        row.appendChild(wrap);
+        row.appendChild(count);
+
+        container.appendChild(row);
+      });
+    }
+
+    function renderTable(records) {
       const tbody = document.getElementById("recentRecordsBody");
       tbody.innerHTML = "";
 
-      (data.recentRecords || []).forEach(record => {
-        const row = `
-          <tr>
-            <td>${record.incident_id ?? ""}</td>
-            <td>${record.reported_date ?? ""}</td>
-            <td>${record.suburb ?? ""}</td>
-            <td>${record.category ?? ""}</td>
-            <td>${record.status ?? ""}</td>
-            <td>${record.priority ?? ""}</td>
-          </tr>
-        `;
-        tbody.innerHTML += row;
-      });
-
-      const labels = (data.byCategory || []).map(x => x.category);
-      const counts = (data.byCategory || []).map(x => x.count);
-
-      const canvas = document.getElementById("categoryChart");
-      if (labels.length > 0) {
-        new Chart(canvas, {
-          type: "bar",
-          data: {
-            labels: labels,
-            datasets: [{
-              label: "Incidents",
-              data: counts
-            }]
-          },
-          options: {
-            responsive: true,
-            plugins: {
-              legend: { display: false }
-            }
-          }
-        });
+      if (!records || records.length === 0) {
+        const row = document.createElement("tr");
+        row.innerHTML = '<td colspan="6">No recent records available.</td>';
+        tbody.appendChild(row);
+        return;
       }
-    } catch (error) {
-      console.error("Dashboard load failed:", error);
-      document.getElementById("lastUpdated").textContent = "Error loading data";
-    }
-  }
 
-  loadDashboard();
-</script>
+      records.forEach(record => {
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td>${record.incident_id ?? ""}</td>
+          <td>${record.reported_date ?? ""}</td>
+          <td>${record.suburb ?? ""}</td>
+          <td>${record.category ?? ""}</td>
+          <td>${record.status ?? ""}</td>
+          <td>${record.priority ?? ""}</td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    async function loadDashboard() {
+      const errorBox = document.getElementById("errorBox");
+
+      try {
+        const response = await fetch(dataUrl, { cache: "no-store" });
+        if (!response.ok) {
+          throw new Error("HTTP " + response.status);
+        }
+
+        const raw = await response.text();
+        console.log("RAW summary.json:", raw);
+
+        let outer = JSON.parse(raw);
+        if (typeof outer === "string") {
+          outer = JSON.parse(outer);
+        }
+
+        let data = outer;
+
+        if (outer.dashboardJson) {
+          data = typeof outer.dashboardJson === "string"
+            ? JSON.parse(outer.dashboardJson)
+            : outer.dashboardJson;
+        } else if (outer.dashboard) {
+          data = outer.dashboard;
+        }
+
+        console.log("PARSED dashboard object:", data);
+
+        setText("totalIncidents", data.metrics?.totalIncidents);
+        setText("openIncidents", data.metrics?.openIncidents);
+        setText("resolvedIncidents", data.metrics?.resolvedIncidents);
+        setText("inProgressIncidents", data.metrics?.inProgressIncidents);
+        setText("lastUpdated", data.lastUpdated);
+
+        renderBars(data.byCategory || []);
+        renderTable(data.recentRecords || []);
+      } catch (err) {
+        console.error(err);
+        errorBox.textContent = "Dashboard load error: " + err.message;
+        setText("totalIncidents", "-");
+        setText("openIncidents", "-");
+        setText("resolvedIncidents", "-");
+        setText("inProgressIncidents", "-");
+        setText("lastUpdated", "Error loading data");
+      }
+    }
+
+    loadDashboard();
+  </script>
+</body>
+</html>
