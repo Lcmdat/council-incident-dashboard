@@ -1,0 +1,78 @@
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  const dataUrl = "https://councilincidents01.blob.core.windows.net/public-dashboard-data/summary.json";
+
+  async function loadDashboard() {
+    try {
+      const response = await fetch(dataUrl);
+      if (!response.ok) {
+        throw new Error("HTTP error " + response.status);
+      }
+
+      const raw = await response.text();
+      let data = JSON.parse(raw);
+
+      if (typeof data === "string") {
+        data = JSON.parse(data);
+      }
+
+      console.log("Dashboard data loaded:", data);
+
+      document.getElementById("totalIncidents").textContent =
+        data.metrics?.totalIncidents ?? "-";
+      document.getElementById("openIncidents").textContent =
+        data.metrics?.openIncidents ?? "-";
+      document.getElementById("resolvedIncidents").textContent =
+        data.metrics?.resolvedIncidents ?? "-";
+      document.getElementById("inProgressIncidents").textContent =
+        data.metrics?.inProgressIncidents ?? "-";
+      document.getElementById("lastUpdated").textContent =
+        data.lastUpdated ?? "-";
+
+      const tbody = document.getElementById("recentRecordsBody");
+      tbody.innerHTML = "";
+
+      (data.recentRecords || []).forEach(record => {
+        const row = `
+          <tr>
+            <td>${record.incident_id ?? ""}</td>
+            <td>${record.reported_date ?? ""}</td>
+            <td>${record.suburb ?? ""}</td>
+            <td>${record.category ?? ""}</td>
+            <td>${record.status ?? ""}</td>
+            <td>${record.priority ?? ""}</td>
+          </tr>
+        `;
+        tbody.innerHTML += row;
+      });
+
+      const labels = (data.byCategory || []).map(x => x.category);
+      const counts = (data.byCategory || []).map(x => x.count);
+
+      const canvas = document.getElementById("categoryChart");
+      if (labels.length > 0) {
+        new Chart(canvas, {
+          type: "bar",
+          data: {
+            labels: labels,
+            datasets: [{
+              label: "Incidents",
+              data: counts
+            }]
+          },
+          options: {
+            responsive: true,
+            plugins: {
+              legend: { display: false }
+            }
+          }
+        });
+      }
+    } catch (error) {
+      console.error("Dashboard load failed:", error);
+      document.getElementById("lastUpdated").textContent = "Error loading data";
+    }
+  }
+
+  loadDashboard();
+</script>
